@@ -1,2 +1,2 @@
 # MyOwnLispEquivalent
-Working through Build Your Own Lisp (http://www.buildyourownlisp.com/) 
+Working through Build Your Own Lisp At a glacial pace (http://www.buildyourownlisp.com/) 
