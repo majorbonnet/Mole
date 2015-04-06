@@ -139,7 +139,17 @@ lval eval_op(lval x, char* op, lval y) {
         return eval_int_op(x.value.i, op, y.value.i);
     }
     
-    if (x.type == LVAL_FLOAT || y.type == LVAL_FLOAT)
+    if (x.type == LVAL_FLOAT && y.type == LVAL_INT)
+    {
+        return eval_float_op(x.value.d, op, (double)y.value.i);
+    } 
+    
+    if (x.type == LVAL_INT && y.type == LVAL_FLOAT)
+    {
+        return eval_float_op((double)x.value.i, op, y.value.d);
+    } 
+    
+    if (x.type == LVAL_FLOAT && y.type == LVAL_FLOAT)
     {
         return eval_float_op(x.value.d, op, y.value.d);
     } 
