@@ -25,17 +25,33 @@ void add_history(char* unused) {}
 #include <editline/history.h>
 #endif
 
+typedef enum { LVAL_INT, LVAL_FLOAT, LVAL_ERR } lval_type_t;
+typedef enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM } lval_error_t;
+
+typedef union lval_value
+{
+    long i;
+    double d;
+    lval_error_t err;   
+} lval_value_t;
+
 typedef struct 
 {
-    char* type;
-    int i;
-    double d;
-} Value;
+    lval_type_t type;
+    lval_value_t value;
+} lval;
 
-Value eval_op(Value, char*, Value);
-double eval_float_op(double, char*, double);
-int eval_int_op(int, char*, int);
-Value eval(mpc_ast_t*);
+lval lval_int(long);
+lval lval_float(double);
+lval lval_err(lval_error_t);
+
+void lval_print(lval);
+void lval_println(lval);
+
+lval eval_op(lval, char*, lval);
+lval eval_float_op(double, char*, double);
+lval eval_int_op(long, char*, long);
+lval eval(mpc_ast_t*);
 
 int main(int argc, char** argv) {
     mpc_parser_t* Flt = mpc_new("flt");
@@ -64,16 +80,9 @@ int main(int argc, char** argv) {
 		mpc_result_t r;
         
         if(mpc_parse("<stdin>", input, Lispy, &r)) {
-            Value result = eval(r.output);
+            lval result = eval(r.output);
             
-            if (strstr(result.type, "flt"))
-            {
-                printf("%f\n", result.d);
-            }
-            else
-            {
-                printf("%d\n", result.i);
-            }
+            lval_println(result);
             
             mpc_ast_delete(r.output);
         } else {
@@ -89,85 +98,151 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-Value eval_op(Value x, char* op, Value y) {
-    Value val;
-    
-    // there has to be a more efficient way to structure this
-    // I need to read up on my C again.
-    if (strstr(x.type, "integer") && strstr(y.type, "integer")) 
+void lval_print(lval val)
+{
+    switch (val.type)
     {
-        val.type = "integer\0";
-        val.i = eval_int_op(x.i, op, y.i);
-        
-        return val;
+        case LVAL_FLOAT:
+            printf("%f", val.value.d);
+            break;
+        case LVAL_INT:
+            printf("%d", val.value.i);
+            break;
+        case LVAL_ERR:
+            if (val.value.err == LERR_DIV_ZERO) {
+                printf("Error: Division By Zero!");
+            }
+            
+            if (val.value.err == LERR_BAD_OP)   {
+                printf("Error: Invalid Operator!");
+            }
+            
+            if (val.value.err == LERR_BAD_NUM)  {
+                printf("Error: Invalid Number!");
+            }
+            break;
+    }   
+}
+
+void lval_println(lval val)
+{
+    lval_print(val);
+    putchar('\n');
+}
+
+lval eval_op(lval x, char* op, lval y) {
+    if (x.type == LVAL_ERR) { return x; }
+    if (y.type == LVAL_ERR) { return y; }
+    
+    if (x.type == LVAL_INT && y.type == LVAL_INT) 
+    {
+        return eval_int_op(x.value.i, op, y.value.i);
     }
     
-    if (strstr(x.type, "flt") && strstr(y.type, "integer"))
+    if (x.type == LVAL_FLOAT || y.type == LVAL_FLOAT)
     {
-        val.type = "flt\0";
-        val.d = eval_float_op(x.d, op, (double)y.i);
-        return val;
+        return eval_float_op(x.value.d, op, y.value.d);
     } 
-    
-    if (strstr(x.type, "integer") && strstr(y.type, "flt"))
-    {
-        val.type = "flt\0";
-        val.d = eval_float_op((double)x.i, op, y.d);
-        return val;
-    } 
-    
-    if (strstr(x.type, "flt") && strstr(y.type, "flt"))
-    {
-        val.type = "flt\0";
-        val.d = eval_float_op(x.d, op, y.d);
-        return val;
-    } 
+ 
+    return lval_err(LERR_BAD_OP);
+}
 
-    // default return value
-    // should really throw an error if we hit this point    
-    val.type = "integer\0";
-    val.i = 0;
+lval eval_int_op(long x, char* op, long y)
+{   
+    if (strcmp(op, "+") == 0) 
+    { 
+        return lval_int(x + y);
+    }
+    
+    if (strcmp(op, "-") == 0) 
+    { 
+        return lval_int(x - y);
+    }
+    
+    if (strcmp(op, "*") == 0) 
+    { 
+        return lval_int(x * y);
+    }
+    
+    if (strcmp(op, "/") == 0)
+    { 
+        return (y == 0 ? lval_err(LERR_DIV_ZERO) : lval_int(x / y));
+    }
+    
+    if (strcmp(op, "%") == 0) 
+    { 
+        return lval_int(x % y);
+    }
+    
+    return lval_err(LERR_BAD_OP);
+}
+
+lval eval_float_op(double x, char* op, double y)
+{   
+    if (strcmp(op, "+") == 0) 
+    { 
+        return lval_float(x + y);
+    }
+    
+    if (strcmp(op, "-") == 0) 
+    { 
+        return lval_float(x - y);
+    }
+    
+    if (strcmp(op, "*") == 0) 
+    { 
+        return lval_float(x * y);
+    }
+    
+    if (strcmp(op, "/") == 0)
+    { 
+        return (y == 0 ? lval_err(LERR_DIV_ZERO) : lval_int(x / y));
+    }
+ 
+    return lval_err(LERR_BAD_OP);
+}
+
+lval lval_int(long x)
+{
+    lval val;
+    val.type = LVAL_INT;
+    val.value.i = x;
+    
     return val;
 }
 
-int eval_int_op(int x, char* op, int y)
+lval lval_float(double x)
 {
-    if (strcmp(op, "+") == 0) { return x + y; }
-    if (strcmp(op, "-") == 0) { return x - y; }
-    if (strcmp(op, "*") == 0) { return x * y; }
-    if (strcmp(op, "/") == 0) { return x / y; }
-    if (strcmp(op, "%") == 0) { return x % y; }
-      
-    return 0;
+    lval val;
+    val.type = LVAL_FLOAT;
+    val.value.d = x;
+    
+    return val;
 }
 
-double eval_float_op(double x, char* op, double y)
+lval lval_err(lval_error_t err)
 {
-    if (strcmp(op, "+") == 0) { return x + y; }
-    if (strcmp(op, "-") == 0) { return x - y; }
-    if (strcmp(op, "*") == 0) { return x * y; }
-    if (strcmp(op, "/") == 0) { return x / y; }
-     
-    return 0;
+    lval val;
+    val.type = LVAL_ERR;
+    val.value.err = err;
+    
+    return val;
 }
 
-Value eval(mpc_ast_t* t) {
-    Value val;
+lval eval(mpc_ast_t* t) {
     if (strstr(t->tag, "integer")) {
-        val.type = "integer\0";
-        val.i = atoi(t-> contents);
-        return val;
+        errno = 0;
+        long x = strtol(t->contents, NULL, 10);
+        return errno != ERANGE ? lval_int(x) : lval_err(LERR_BAD_NUM);
     }
     
     if (strstr(t->tag, "flt")) {
-        val.type = "flt\0";
-        val.d = atof(t-> contents);
-        return val;
+        return lval_float(atof(t-> contents));
     }
     
     char* op = t->children[1]->contents;
     
-    Value x = eval(t->children[2]);
+    lval x = eval(t->children[2]);
     
     int i = 3;
     
