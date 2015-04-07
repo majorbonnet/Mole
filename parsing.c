@@ -25,25 +25,25 @@ void add_history(char* unused) {}
 #include <editline/history.h>
 #endif
 
-typedef enum { LVAL_INT, LVAL_FLOAT, LVAL_ERR } lval_type_t;
-typedef enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM } lval_error_t;
+typedef enum { LVAL_INT, LVAL_FLOAT, LVAL_ERR } lval_type;
+typedef enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM } lval_error;
 
 typedef union lval_value
 {
     long i;
     double d;
-    lval_error_t err;   
-} lval_value_t;
+    lval_error err;   
+} lval_value;
 
 typedef struct 
 {
-    lval_type_t type;
-    lval_value_t value;
+    lval_type type;
+    lval_value value;
 } lval;
 
 lval lval_int(long);
 lval lval_float(double);
-lval lval_err(lval_error_t);
+lval lval_err(lval_error);
 
 void lval_print(lval);
 void lval_println(lval);
@@ -230,7 +230,7 @@ lval lval_float(double x)
     return val;
 }
 
-lval lval_err(lval_error_t err)
+lval lval_err(lval_error err)
 {
     lval val;
     val.type = LVAL_ERR;
