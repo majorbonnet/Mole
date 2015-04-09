@@ -25,45 +25,7 @@ void add_history(char* unused) {}
 #include <editline/history.h>
 #endif
 
-typedef enum { LVAL_INT, LVAL_FLOAT, LVAL_ERR, LVAL_SYM, LVAL_SEXPR } lval_type;
-
-typedef union lval_value
-{
-    long i;
-    double d;
-    char* sym;
-    char* err;
-} lval_value;
-
-typedef struct lval
-{
-    lval_type type;
-    lval_value value;
-    int count; // number of child lvals
-    struct lval** cell;
-} lval;
-
-lval* lval_int(long);
-lval* lval_float(double);
-lval* lval_sym(char*);
-lval* lval_sexpr(void);
-lval* lval_err(char*);
-void lval_del(lval*);
-
-void lval_expr_print(lval*, char, char);
-void lval_print(lval*);
-void lval_println(lval*);
-
-lval* lval_eval(lval*);
-lval* lval_pop(lval*, int);
-lval* lval_take(lval*, int);
-lval* eval_sexpr(lval*);
-void eval_float_op(lval*, char*, lval*);
-void eval_int_op(lval*, char*, lval*);
-
-lval* lval_add(lval*, lval*);
-lval* lval_read_num(mpc_ast_t* t);
-lval* lval_read(mpc_ast_t*);
+#include "parsing.h"
 
 int main(int argc, char** argv) {
     mpc_parser_t* Flt = mpc_new("flt");
@@ -174,6 +136,9 @@ lval* lval_take(lval* val, int i)
 
 lval* builtin_op(lval* a, char* op) 
 {
+  // mostly because of the modulo operator, which is only applicable to ints
+  // I have one function to handle floats and one to handle ints
+  // the op_type variable determines which function we will use
   lval_type op_type = LVAL_INT;
   for (int i = 0; i < a->count; i++) 
   {
@@ -183,6 +148,7 @@ lval* builtin_op(lval* a, char* op)
       return lval_err("Cannot operate on non-number!");
     }
     
+    // if 
     if (a->cell[i]->type == LVAL_FLOAT)
     {
         op_type = LVAL_FLOAT;
@@ -207,7 +173,7 @@ lval* builtin_op(lval* a, char* op)
   while (a->count > 0) 
   {
     lval* y = lval_pop(a, 0);
-    
+        
     switch (op_type)
     {
         case LVAL_INT:
